@@ -15,6 +15,7 @@ import (
 type apiConfig struct {
 	fileserverRequests atomic.Int32
 	db                 *database.Queries
+	platform           string
 }
 
 func main() {
@@ -24,6 +25,7 @@ func main() {
 
 	//get dbURL from .env
 	dbURL := os.Getenv("DB_URL")
+	platform := os.Getenv("PLATFORM")
 
 	//open db connection
 	db, err := sql.Open("postgres", dbURL)
@@ -34,6 +36,7 @@ func main() {
 	apiCfg := apiConfig{
 		fileserverRequests: atomic.Int32{},
 		db:                 database.New(db),
+		platform:           platform,
 	}
 
 	const port = "8080"
@@ -49,6 +52,7 @@ func main() {
 
 	mux.HandleFunc("GET /api/healthz", handlerHealth)
 	mux.HandleFunc("POST /api/validate_chirp", handlerValidateChirp)
+	mux.HandleFunc("POST /api/users", apiCfg.handlerUsers)
 
 	srv := http.Server{
 		Addr:    ":" + port,
