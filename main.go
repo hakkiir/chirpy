@@ -1,25 +1,61 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
+	"os"
+	"sync/atomic"
+
+	"github.com/hakkiir/chirpy/internal/database"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
-const port = "8080"
+type apiConfig struct {
+	fileserverRequests atomic.Int32
+	db                 *database.Queries
+}
 
 func main() {
 
+	//load .env
+	godotenv.Load(".env")
+
+	//get dbURL from .env
+	dbURL := os.Getenv("DB_URL")
+
+	//open db connection
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		log.Fatal("db connection failed")
+	}
+
+	apiCfg := apiConfig{
+		fileserverRequests: atomic.Int32{},
+		db:                 database.New(db),
+	}
+
+	const port = "8080"
+	const filepathRoot = "app/"
+
 	mux := http.NewServeMux()
-	server := http.Server{
+
+	fsHandler := apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot))))
+	mux.Handle("/app/", fsHandler)
+
+	mux.HandleFunc("GET /admin/metrics", apiCfg.handlerMetrics)
+	mux.HandleFunc("POST /admin/reset", apiCfg.handlerReset)
+
+	mux.HandleFunc("GET /api/healthz", handlerHealth)
+	mux.HandleFunc("POST /api/validate_chirp", handlerValidateChirp)
+
+	srv := http.Server{
 		Addr:    ":" + port,
 		Handler: mux,
 	}
 
-	mux.Handle("/", http.FileServer(http.Dir(".")))
-
-	err := server.ListenAndServe()
-	if err != nil {
-		log.Fatal(err)
-	}
+	log.Printf("Serving files from %s on port: %s\n", filepathRoot, port)
+	log.Fatal(srv.ListenAndServe())
 
 }
