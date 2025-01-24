@@ -16,6 +16,7 @@ type apiConfig struct {
 	fileserverRequests atomic.Int32
 	db                 *database.Queries
 	platform           string
+	secret             string
 }
 
 func main() {
@@ -23,9 +24,10 @@ func main() {
 	//load .env
 	godotenv.Load(".env")
 
-	//get dbURL from .env
+	//get variables from .env
 	dbURL := os.Getenv("DB_URL")
 	platform := os.Getenv("PLATFORM")
+	secret := os.Getenv("SECRET")
 
 	//open db connection
 	db, err := sql.Open("postgres", dbURL)
@@ -37,6 +39,7 @@ func main() {
 		fileserverRequests: atomic.Int32{},
 		db:                 database.New(db),
 		platform:           platform,
+		secret:             secret,
 	}
 
 	const port = "8080"

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/hakkiir/chirpy/internal/auth"
 	"github.com/hakkiir/chirpy/internal/database"
 )
 
@@ -22,13 +23,23 @@ type Chirp struct {
 func (cfg *apiConfig) handlerValidateChirp(w http.ResponseWriter, req *http.Request) {
 
 	type parameters struct {
-		Body   string    `json:"body"`
-		UserID uuid.UUID `json:"user_id"`
+		Body string `json:"body"`
+	}
+
+	bearerToken, err := auth.GetBearerToken(req.Header)
+	if err != nil {
+		respondWError(w, http.StatusUnauthorized, "invalid bearer token", err)
+		return
+	}
+	tokenUUID, err := auth.ValidateJWT(bearerToken, cfg.secret)
+	if err != nil {
+		respondWError(w, http.StatusUnauthorized, "invalid bearer token", err)
+		return
 	}
 
 	decoder := json.NewDecoder(req.Body)
 	params := parameters{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		respondWError(w, http.StatusInternalServerError, "Error decoding params", err)
 		return
@@ -56,7 +67,7 @@ func (cfg *apiConfig) handlerValidateChirp(w http.ResponseWriter, req *http.Requ
 	//Insert chirp to database
 	chirp, err := cfg.db.CreateChirp(req.Context(), database.CreateChirpParams{
 		Body:   params.Body,
-		UserID: params.UserID,
+		UserID: tokenUUID,
 	})
 	if err != nil {
 		respondWError(w, http.StatusInternalServerError, "Error inserting data to database", err)
