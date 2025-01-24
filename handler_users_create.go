@@ -2,10 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/hakkiir/chirpy/internal/auth"
+	"github.com/hakkiir/chirpy/internal/database"
 )
 
 type User struct {
@@ -18,7 +21,8 @@ type User struct {
 func (cfg *apiConfig) handlerUsers(w http.ResponseWriter, req *http.Request) {
 
 	type reqBody struct {
-		Email string `json:"email"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 
 	decoder := json.NewDecoder(req.Body)
@@ -30,7 +34,17 @@ func (cfg *apiConfig) handlerUsers(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	user, err := cfg.db.CreateUser(req.Context(), r.Email)
+	hashedPw, err := auth.HashPassword(r.Password)
+	if err != nil {
+		log.Print("error hashing pw")
+		respondWError(w, http.StatusInternalServerError, "Error hashing pw", err)
+		return
+	}
+	user, err := cfg.db.CreateUser(req.Context(), database.CreateUserParams{
+		Email:          r.Email,
+		HashedPassword: hashedPw,
+	})
+
 	if err != nil {
 		respondWError(w, http.StatusInternalServerError, "Error querying database", err)
 		return
