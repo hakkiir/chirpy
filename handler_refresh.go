@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/hakkiir/chirpy/internal/auth"
@@ -17,20 +16,12 @@ func (cfg *apiConfig) handlerRefresh(w http.ResponseWriter, req *http.Request) {
 		Token string `json:"token"`
 	}
 
-	headers := req.Header
-	authHeader := headers.Get("Authorization")
-	if authHeader == "" {
-		respondWError(w, http.StatusBadRequest, "malformed authorization header", nil)
+	refToken, err := auth.GetBearerToken(req.Header)
+
+	if err != nil {
+		respondWError(w, http.StatusBadRequest, "Couldn't find token", err)
 		return
 	}
-
-	splitAuth := strings.Split(authHeader, " ")
-	if len(splitAuth) < 2 || splitAuth[0] != "Bearer" {
-		respondWError(w, http.StatusBadRequest, "malformed authorization header", nil)
-		return
-	}
-
-	refToken := splitAuth[1]
 
 	dbToken, err := cfg.db.GetRefreshToken(req.Context(), refToken)
 	if err != nil {
