@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -98,12 +97,10 @@ func GetBearerToken(headers http.Header) (string, error) {
 }
 
 func MakeRefreshToken() (string, error) {
-	b := make([]byte, 32)
-	data, err := rand.Read(b)
+	token := make([]byte, 32)
+	_, err := rand.Read(token)
 	if err != nil {
 		return "", err
 	}
-	hexStr := hex.EncodeToString([]byte(strconv.Itoa(data)))
-
-	return hexStr, nil
+	return hex.EncodeToString(token), nil
 }
