@@ -6,16 +6,23 @@ import (
 	"time"
 
 	"github.com/hakkiir/chirpy/internal/auth"
+	"github.com/hakkiir/chirpy/internal/database"
 )
 
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 
 	type parameters struct {
-		Email            string `json:"email"`
-		Password         string `json:"password"`
-		ExpiresInSeconds int    `json:"expires_in_seconds,omitempty"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 
+	type response struct {
+		User
+		Token        string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
+	}
+
+	// Decode request json
 	decoder := json.NewDecoder(req.Body)
 	params := parameters{}
 	err := decoder.Decode(&params)
@@ -24,6 +31,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Validate login
 	user, err := cfg.db.GetUserByEmail(req.Context(), params.Email)
 	if err != nil {
 		respondWError(w, http.StatusUnauthorized, "Incorrect email or password", err)
@@ -36,23 +44,39 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	tokenExpirationTime := time.Hour
+	// Create JWT access token
 
-	if params.ExpiresInSeconds > 0 && params.ExpiresInSeconds < 3600 {
-		tokenExpirationTime = time.Duration(params.ExpiresInSeconds) * time.Second
-	}
+	const tokenExpirationTime = time.Hour
 	JWT, err := auth.MakeJWT(user.ID, cfg.secret, tokenExpirationTime)
 	if err != nil {
-		respondWError(w, http.StatusInternalServerError, "error creating token", err)
+		respondWError(w, http.StatusInternalServerError, "error creating access token", err)
 		return
 	}
 
-	respondWJson(w, http.StatusOK, User{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Email:     user.Email,
-		Token:     JWT,
+	// Create refresh token
+	refreshToken, err := auth.MakeRefreshToken()
+	if err != nil {
+		respondWError(w, http.StatusInternalServerError, "error creating refresh token", err)
+		return
+	}
+	_, err = cfg.db.InsertRefrestToken(req.Context(), database.InsertRefrestTokenParams{
+		Token:  refreshToken,
+		UserID: user.ID,
+	})
+	if err != nil {
+		respondWError(w, http.StatusInternalServerError, "error inserting refresh token to db", err)
+		return
+	}
+
+	respondWJson(w, http.StatusOK, response{
+		User: User{
+			ID:        user.ID,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+			Email:     user.Email,
+		},
+		Token:        JWT,
+		RefreshToken: refreshToken,
 	})
 
 }
