@@ -39,7 +39,7 @@ func (cfg *apiConfig) handlerGetSingleChirp(w http.ResponseWriter, req *http.Req
 
 	dbChirp, err := cfg.db.GetSingleChirp(req.Context(), uid)
 	if err != nil {
-		respondWError(w, http.StatusInternalServerError, "Error querying database", err)
+		respondWError(w, http.StatusNotFound, "Chirp not found", err)
 		return
 	}
 
