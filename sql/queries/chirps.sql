@@ -12,6 +12,8 @@ RETURNING *;
 -- name: GetAllChirps :many
 SELECT * 
 FROM chirps
+WHERE
+(user_id = sqlc.narg('user_id') OR sqlc.narg('user_id') IS NULL)
 ORDER BY created_at ASC;
 
 -- name: GetSingleChirp :one
@@ -23,3 +25,9 @@ WHERE id = $1;
 DELETE 
 FROM chirps
 WHERE user_id = $1 AND id = $2;
+
+-- name: GetChirpsByAuthorId :many
+SELECT * 
+FROM chirps
+WHERe user_id = $1
+ORDER BY created_at ASC;
